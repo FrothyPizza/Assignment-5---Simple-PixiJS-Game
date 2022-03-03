@@ -17,9 +17,23 @@ let renderer = app.renderer;
 mouse.relativeContainer = app.view;
 
 
-
 let startScene = new PIXI.Container();
 stage.addChild(startScene);
+
+if(localStorage.getItem('highscore') === null) {
+    localStorage.setItem('highscore', 0);
+}
+let highScoreText = new PIXI.Text(`High Score: ${localStorage.getItem('highscore')}`, {
+    fontFamily: 'Arial',
+    fontSize: 24,
+    fill: 0x00ff00,
+    align: 'center'
+});
+highScoreText.x = renderer.width / 2 - highScoreText.width / 2;
+highScoreText.y = renderer.height / 2 - highScoreText.height / 2 + 40;
+startScene.addChild(highScoreText);
+
+
 loader.load(() => {
     let startButton = new PIXI.Sprite(loader.resources.startButton.texture);
     startButton.x = renderer.width / 2 - startButton.width / 2;
@@ -31,6 +45,11 @@ loader.load(() => {
         startScene.visible = false;
     });
     startScene.addChild(startButton);
+
+
+
+
+
 });
 
 let gameScene = new PIXI.Container();
@@ -39,19 +58,6 @@ stage.addChild(gameScene);
 
 
 function wrap(pos, size) {
-    // if(obj.x + obj.width < 0) {
-    //     obj.x = app.screen.width;
-    // }
-    // if(obj.x - obj.width > app.screen.width) {
-    //     obj.x = 0;
-    // }
-    // if(obj.y + obj.height < 0) {
-    //     obj.y = app.screen.height;
-    // }
-    // if(obj.y - obj.height > app.screen.height) {
-    //     obj.y = 0;
-    // }
-
     if(pos.x + size.x < 0) {
         pos.x = app.screen.width;
     }
@@ -90,6 +96,7 @@ class Enemy {
 
     destroy() {
         gameScene.removeChild(this.gfx);
+        this.gfx.destroy();
     }
 
     update(delta) {
@@ -149,9 +156,15 @@ class Player {
         this.gfx.drawCircle(0, 0, this.radius);
         this.gfx.endFill();
 
+        this.distanceText = new PIXI.Text('',{fontFamily : 'Arial', fontSize: 24, fill : 0x00FF00, align : 'center'});
+
+
         this.pos.x = renderer.width / 2;
         this.pos.y = renderer.height / 2;
 
+        this.distanceTraveled = 0;
+
+        gameScene.addChild(this.distanceText);
         gameScene.addChild(this.gfx);
     }
 
@@ -169,10 +182,17 @@ class Player {
             this.vel.length = 0;
         }
 
+        this.distanceTraveled += this.vel.length;
+        this.distanceText.text = this.distanceTraveled.toFixed(2);
+
         this.pos.x += this.vel.x;
         this.pos.y += this.vel.y;
 
         this.updateGraphicsPosition();
+
+        if(this.distanceTraveled > localStorage.getItem('highscore')) {
+            localStorage.setItem('highscore', this.distanceTraveled.toFixed(2));
+        }
     }
 
     colliding(enemies) {
@@ -192,6 +212,9 @@ class Player {
 
     destroy() {
         gameScene.removeChild(this.gfx);
+        gameScene.removeChild(this.distanceText);
+        this.gfx.destroy();
+        this.distanceText.destroy();
     }
 
 
@@ -207,7 +230,7 @@ let player = new Player();
 
 let enemySpawnTimer = new Clock();
 enemySpawnTimer.start();
-const ENEMY_SPAWN_DELAY_MS = 500;
+const ENEMY_SPAWN_DELAY_MS = 750;
 
 let lastTime = 0;
 function gameLoop() {
@@ -217,18 +240,22 @@ function gameLoop() {
     if(delta > 0.2) delta = 0.2;
     if(delta < 0) delta = 0;
 
-    enemies.forEach(enemy => {
-        enemy.update(delta);
-    });
 
-    player.update(delta);
-    if(player.colliding(enemies)) {
-        showMenu();
-    }
+    if(gameScene.visible) {
+        enemies.forEach(enemy => {
+            enemy.update(delta);
+        });
 
-    if(enemySpawnTimer.getElapsedTime() > ENEMY_SPAWN_DELAY_MS) {
-        enemySpawnTimer.restart();
-        enemies.push(new Enemy());
+        if(player.colliding(enemies)) {
+            showMenu();
+        }
+        player.update(delta);
+
+
+        if(enemySpawnTimer.getElapsedTime() > ENEMY_SPAWN_DELAY_MS) {
+            enemySpawnTimer.restart();
+            enemies.push(new Enemy());
+        }
     }
 
 
@@ -236,6 +263,10 @@ function gameLoop() {
 } 
 
 function startGame() {
+    //console.log(player.distanceTraveled);
+
+
+
     gameScene.visible = true;
     
     enemies.forEach(enemy => {
@@ -256,6 +287,8 @@ function startGame() {
 
 
 function showMenu() {
+    highScoreText.text = "High Score: " + localStorage.getItem('highscore');
+
     gameScene.visible = false;
     startScene.visible = true;
 }
